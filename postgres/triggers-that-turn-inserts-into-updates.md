@@ -32,7 +32,7 @@ large import, holds the lock for its whole length.
 
 ## The fix: insert the changes, aggregate later
 
-At Pennylane, we kept the trigger, but it now only inserts each change
+We kept the trigger, but it now only inserts each change
 into a deltas table. An insert adds the new values, a delete adds the old
 values negated, and an update does both:
 
