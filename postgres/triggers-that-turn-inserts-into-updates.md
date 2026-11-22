@@ -51,10 +51,8 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 ```
 
-Inserts never wait on each other. Right after the transaction commits,
-the code that wrote the entries flushes its deltas into the aggregate
-table. The flush must run outside that transaction, or the lock waits
-come back. `SKIP LOCKED` keeps two flushes from waiting on each other:
+Inserts never wait on each other. Later, outside the writing transaction,
+a job or service flushes the deltas into the aggregate table:
 
 ```sql
 WITH batch AS (
@@ -74,10 +72,6 @@ ON CONFLICT (company_id, date) DO UPDATE
 SET debit = ledger_entries_stats.debit + excluded.debit,
     credit = ledger_entries_stats.credit + excluded.credit;
 ```
-
-A job runs every minute and flushes the deltas older than 30 seconds, in
-case a code path didn't flush its own. The 30 seconds leave time for open
-transactions to commit and flush first.
 
 Two other ways to build the aggregate table away from the writers:
 
