@@ -1,7 +1,5 @@
 # Updating aggregate tables from triggers causes lock contention
 
-## The context
-
 We had a ledger table where each entry has a `debit` and a `credit`. To
 report totals by month or year, we didn't want to read every entry. So we
 kept a summary table with one row per account per day, and summed those
