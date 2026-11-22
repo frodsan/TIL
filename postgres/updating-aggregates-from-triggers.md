@@ -1,4 +1,4 @@
-# Don't update aggregate tables from triggers
+# Updating aggregate tables from triggers causes lock contention
 
 ## The context
 
