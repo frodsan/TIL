@@ -1,4 +1,4 @@
-# Updating aggregate tables from triggers causes lock contention
+# Triggers that turn inserts into updates cause lock contention
 
 At Pennylane, we had a ledger table where each entry has a `debit` and a
 `credit`. To report totals by month or year, we didn't want

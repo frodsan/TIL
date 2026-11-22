@@ -10,7 +10,7 @@ Today I learned: short notes on things I have learned.
 
 ### Locking
 
-- [Updating aggregate tables from triggers causes lock contention](postgres/updating-aggregates-from-triggers.md)
+- [Triggers that turn inserts into updates cause lock contention](postgres/triggers-that-turn-inserts-into-updates.md)
 
 ### Logical replication
 
