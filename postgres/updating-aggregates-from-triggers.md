@@ -38,11 +38,6 @@ same account and day, they all need the same summary row, so they wait in
 line, one at a time. A long transaction, such as a large import, holds
 the lock for its whole length.
 
-I tested it on Postgres 18. One transaction inserted an entry and stayed
-open for 4 seconds. A second insert for the same account and day waited
-3.1 seconds, until the first one committed. An insert for another account
-finished in 0.1 seconds.
-
 ## The fix: insert, then aggregate later
 
 Keep the write path free of shared rows. Each transaction writes only its
