@@ -1,7 +1,6 @@
 # TIL
 
-Today I learned: short notes on things I have learned or that surprised me.
-Each note is one file, grouped in a folder per topic.
+Today I learned: short notes on things I have learned.
 
 ## Postgres
 
