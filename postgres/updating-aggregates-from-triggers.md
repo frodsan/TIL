@@ -56,7 +56,8 @@ Two other ways to build the summary away from the writers:
 - **LISTEN/NOTIFY.** Each write sends a `NOTIFY`, and a separate service
   adds up the changes in memory and writes them every few seconds. A
   notification reaches only connected listeners, so the service must
-  rebuild from the ledger when it starts.
+  rebuild from the ledger when it starts. The Art of PostgreSQL builds
+  this service step by step in its "Listen and Notify" chapter.
 
 A trigger like this is fine when writes spread over many summary rows.
 The problem appears when many writers hit the same row.
@@ -67,5 +68,6 @@ The problem appears when many writers hit the same row.
   Fontaine. Its chapter on triggers calls a trigger that turns inserts
   into updates of one row "a classic anti-pattern". Its benchmark shows
   the cost: 1,000 increments of one row from 100 workers took 3.1 seconds
-  as updates and 2.1 seconds as inserts.
+  as updates and 2.1 seconds as inserts. Its "Listen and Notify" chapter
+  builds the LISTEN/NOTIFY cache service.
 - [Explicit locking: row-level locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
