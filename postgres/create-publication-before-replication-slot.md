@@ -47,10 +47,26 @@ so you restore the target from a snapshot of the source instead. The slot
 must exist before you take the snapshot. Then it keeps every change written
 after the snapshot, and the subscription replays them once it starts.
 
-Newer Postgres versions may skip the missing publication with a warning
-instead of an error. Check the behavior on your version.
+## Postgres 18 skips the changes instead
+
+Up to Postgres 17, the subscription fails with the error above and retries
+forever. Postgres 18 logs a warning and continues:
+
+```
+WARNING:  skipped loading publication "my_pub"
+DETAIL:  The publication does not exist at this point in the WAL.
+HINT:  Create the publication if it does not exist.
+```
+
+This is worse than the error. The changes written between the slot and the
+publication never reach the target, and the subscription looks healthy.
+I tested it on both versions: create the slot, insert row 1, create the
+publication, insert row 2, then subscribe. Postgres 17 stops with the
+error. Postgres 18 copies row 2 and silently loses row 1.
 
 ## References
 
 - [Logical replication](https://www.postgresql.org/docs/current/logical-replication.html)
 - [Logical decoding concepts](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html)
+- [Creating a logical replica from a snapshot in RDS Postgres](https://tech.instacart.com/creating-a-logical-replica-from-a-snapshot-in-rds-postgres-886d9d2c7343), Instacart: the full snapshot and restore procedure, publication first
+- [The warning in Postgres 18's pgoutput](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/replication/pgoutput/pgoutput.c)
