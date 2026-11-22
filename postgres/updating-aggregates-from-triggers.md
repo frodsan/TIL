@@ -3,7 +3,7 @@
 At Pennylane, we had a ledger table where each entry has a `debit` and a
 `credit`. To report totals by month or year, we didn't want
 to read every entry. So we kept an aggregate table with one row per
-account per day, and summed those rows instead.
+company per day, and summed those rows instead.
 
 The aggregate table had to stay right, so every time an entry's `debit`
 or `credit` changed, the row of its day in the aggregate table changed
@@ -12,11 +12,11 @@ too. We did that with a trigger:
 ```sql
 CREATE FUNCTION update_daily_stats() RETURNS trigger AS $$
 BEGIN
-  INSERT INTO daily_ledger_stats (account_id, day, debit, credit)
-  VALUES (NEW.account_id, NEW.date,
+  INSERT INTO daily_ledger_stats (company_id, day, debit, credit)
+  VALUES (NEW.company_id, NEW.date,
           NEW.debit - coalesce(OLD.debit, 0),
           NEW.credit - coalesce(OLD.credit, 0))
-  ON CONFLICT (account_id, day) DO UPDATE
+  ON CONFLICT (company_id, day) DO UPDATE
   SET debit = daily_ledger_stats.debit + excluded.debit,
       credit = daily_ledger_stats.credit + excluded.credit;
   RETURN NEW;
@@ -32,7 +32,7 @@ CREATE TRIGGER update_daily_stats
 Writes to `ledger_entries` don't block each other, but the trigger turns
 each one into an update of the aggregate table. An update locks the row
 until the transaction commits. When many transactions write entries for
-the same account and day, they all need the same row in the aggregate
+the same company and day, they all need the same row in the aggregate
 table, so they wait in
 line, one at a time. A long transaction, such as a large import, holds
 the lock for its whole length.
