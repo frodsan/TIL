@@ -57,12 +57,6 @@ Two other ways to build the summary away from the writers:
   rebuild from the ledger when it starts. The Art of PostgreSQL builds
   this service step by step in its "Listen and Notify" chapter.
 
-You may not need any of this. Transactions wait only when they write
-entries for the same account on the same day at the same time, for example
-several imports running for one account. If each account writes a few
-entries a day, two transactions rarely need the same summary row, and the
-trigger is fine.
-
 ## References
 
 - [The Art of PostgreSQL](https://theartofpostgresql.com), Dimitri
