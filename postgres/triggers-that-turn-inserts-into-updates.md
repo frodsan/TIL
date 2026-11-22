@@ -9,12 +9,16 @@ The aggregate table had to stay right, so a trigger on `INSERT`, `UPDATE`
 and `DELETE` added each change to the row of its date. For an update:
 
 ```sql
-INSERT INTO ledger_entries_stats (company_id, date, debit, credit)
-VALUES (NEW.company_id, NEW.date,
-        NEW.debit - OLD.debit, NEW.credit - OLD.credit)
-ON CONFLICT (company_id, date) DO UPDATE
-SET debit = ledger_entries_stats.debit + excluded.debit,
-    credit = ledger_entries_stats.credit + excluded.credit;
+CREATE FUNCTION update_ledger_entries_stats() RETURNS trigger AS $$
+BEGIN
+  INSERT INTO ledger_entries_stats (company_id, date, debit, credit)
+  VALUES (NEW.company_id, NEW.date,
+          NEW.debit - OLD.debit, NEW.credit - OLD.credit)
+  ON CONFLICT (company_id, date) DO UPDATE
+  SET debit = ledger_entries_stats.debit + excluded.debit,
+      credit = ledger_entries_stats.credit + excluded.credit;
+  RETURN NULL;
+END $$ LANGUAGE plpgsql;
 ```
 
 ## The problem
