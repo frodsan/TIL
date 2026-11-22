@@ -1,30 +1,20 @@
 # Triggers that turn inserts into updates cause lock contention
 
 At Pennylane, we had a ledger table where each entry has a `debit` and a
-`credit`. To report totals by month or year, we didn't want
-to read every entry. So we kept an aggregate table with one row per
-company per day, and summed those rows instead.
+`credit`. To report totals by month or year, we didn't want to read every
+entry. So we kept an aggregate table with one row per company and date,
+and summed those rows instead.
 
-The aggregate table had to stay right, so every time an entry's `debit`
-or `credit` changed, the row of its day in the aggregate table changed
-too. We did that with a trigger:
+The aggregate table had to stay right, so a trigger on `INSERT`, `UPDATE`
+and `DELETE` added each change to the row of its date. For an update:
 
 ```sql
-CREATE FUNCTION update_daily_stats() RETURNS trigger AS $$
-BEGIN
-  INSERT INTO daily_ledger_stats (company_id, day, debit, credit)
-  VALUES (NEW.company_id, NEW.date,
-          NEW.debit - coalesce(OLD.debit, 0),
-          NEW.credit - coalesce(OLD.credit, 0))
-  ON CONFLICT (company_id, day) DO UPDATE
-  SET debit = daily_ledger_stats.debit + excluded.debit,
-      credit = daily_ledger_stats.credit + excluded.credit;
-  RETURN NEW;
-END $$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_daily_stats
-  AFTER INSERT OR UPDATE OF debit, credit ON ledger_entries
-  FOR EACH ROW EXECUTE FUNCTION update_daily_stats();
+INSERT INTO ledger_entries_stats (company_id, date, debit, credit)
+VALUES (NEW.company_id, NEW.date,
+        NEW.debit - OLD.debit, NEW.credit - OLD.credit)
+ON CONFLICT (company_id, date) DO UPDATE
+SET debit = ledger_entries_stats.debit + excluded.debit,
+    credit = ledger_entries_stats.credit + excluded.credit;
 ```
 
 ## The problem
@@ -32,20 +22,58 @@ CREATE TRIGGER update_daily_stats
 Writes to `ledger_entries` don't block each other, but the trigger turns
 each one into an update of the aggregate table. An update locks the row
 until the transaction commits. When many transactions write entries for
-the same company and day, they all need the same row in the aggregate
-table, so they wait in
-line, one at a time. A long transaction, such as a large import, holds
-the lock for its whole length.
+the same company and date, they all need the same row in the aggregate
+table, so they wait in line, one at a time. A long transaction, such as a
+large import, holds the lock for its whole length.
 
-## The fix: insert, then aggregate later
+## The fix: insert the changes, aggregate later
 
-Keep the write path free of shared rows. Each transaction writes only its
-own entries, or inserts the change into a separate table, which never
-waits on another row. A periodic job then sums the changes since its last
-run and applies them to the aggregate table with `INSERT ... ON CONFLICT
-DO UPDATE`. Only the job updates the aggregate table, so nothing waits on
-it. The aggregate table is a little behind, which is fine for monthly and
-yearly reports.
+At Pennylane, we kept the trigger, but it now only inserts each change
+into a deltas table. An insert adds the new values, a delete adds the old
+values negated, and an update does both:
+
+```sql
+CREATE FUNCTION record_ledger_delta() RETURNS trigger AS $$
+BEGIN
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    INSERT INTO ledger_entries_stats_deltas (company_id, date, debit, credit)
+    VALUES (OLD.company_id, OLD.date, -OLD.debit, -OLD.credit);
+  END IF;
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    INSERT INTO ledger_entries_stats_deltas (company_id, date, debit, credit)
+    VALUES (NEW.company_id, NEW.date, NEW.debit, NEW.credit);
+  END IF;
+  RETURN NULL;
+END $$ LANGUAGE plpgsql;
+```
+
+Inserts never wait on each other. Right after the transaction commits,
+the code that wrote the entries flushes its deltas into the aggregate
+table. The flush must run outside that transaction, or the lock waits
+come back. `SKIP LOCKED` keeps two flushes from waiting on each other:
+
+```sql
+WITH batch AS (
+  DELETE FROM ledger_entries_stats_deltas
+  WHERE id IN (
+    SELECT id FROM ledger_entries_stats_deltas
+    WHERE company_id = $1
+    FOR UPDATE SKIP LOCKED
+  )
+  RETURNING *
+)
+INSERT INTO ledger_entries_stats (company_id, date, debit, credit)
+SELECT company_id, date, sum(debit), sum(credit)
+FROM batch
+GROUP BY company_id, date
+ON CONFLICT (company_id, date) DO UPDATE
+SET debit = ledger_entries_stats.debit + excluded.debit,
+    credit = ledger_entries_stats.credit + excluded.credit;
+```
+
+A job runs every minute and flushes the deltas older than 30 seconds, in
+case a code path didn't flush its own. The 30 seconds leave time for open
+transactions to commit and flush first.
 
 Two other ways to build the aggregate table away from the writers:
 
