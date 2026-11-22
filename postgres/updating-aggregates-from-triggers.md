@@ -52,17 +52,15 @@ Two other ways to build the summary away from the writers:
   `REFRESH MATERIALIZED VIEW CONCURRENTLY`. Each refresh recomputes
   everything, so it suits small tables.
 - **LISTEN/NOTIFY.** Each write sends a `NOTIFY`, and a separate service
-  adds up the changes in memory and writes them every few seconds. A
-  notification reaches only connected listeners, so the service must
-  rebuild from the ledger when it starts. The Art of PostgreSQL builds
-  this service step by step in its "Listen and Notify" chapter.
+  adds up the changes in memory and writes them every few seconds
+  [[1]](#references).
 
 ## References
 
-- [The Art of PostgreSQL](https://theartofpostgresql.com), Dimitri
-  Fontaine. Its chapter on triggers calls a trigger that turns inserts
-  into updates of one row "a classic anti-pattern". Its benchmark shows
-  the cost: 1,000 increments of one row from 100 workers took 3.1 seconds
-  as updates and 2.1 seconds as inserts. Its "Listen and Notify" chapter
-  builds the LISTEN/NOTIFY cache service.
-- [Explicit locking: row-level locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
+1. [The Art of PostgreSQL](https://theartofpostgresql.com), Dimitri
+   Fontaine, chapter "Listen and Notify". The service runs `LISTEN`
+   first, rebuilds its totals from the source table, then adds each
+   notification to them in memory and saves them with one upsert every
+   few seconds. Its "Triggers" chapter calls a trigger that turns inserts
+   into updates of one row "a classic anti-pattern".
+2. [Explicit locking: row-level locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
