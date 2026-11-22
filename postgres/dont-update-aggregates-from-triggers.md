@@ -1,4 +1,4 @@
-# Don't update one summary row from many writers
+# Don't update aggregate tables from triggers
 
 ## The context
 

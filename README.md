@@ -10,7 +10,7 @@ Today I learned: short notes on things I have learned.
 
 ### Locking
 
-- [Don't update one summary row from many writers](postgres/avoid-hot-counter-rows.md)
+- [Don't update aggregate tables from triggers](postgres/dont-update-aggregates-from-triggers.md)
 
 ### Logical replication
 
