@@ -37,10 +37,15 @@ CREATE SUBSCRIPTION my_sub
   WITH (create_slot = false, slot_name = 'my_slot', copy_data = false);
 ```
 
-When the subscription creates its own slot (the default), the order is
-right by itself. The problem appears when you create the slot by hand, for
-example to fix the starting point before you take a snapshot of the
-source and restore the target from it.
+Most setups never hit this. By default, `CREATE SUBSCRIPTION` creates the
+slot for you, and the publication must already exist because you name it
+in the command. The order is right without you thinking about it.
+
+You hit it only when you create the slot yourself. One common reason is a
+large database. Copying big tables through the subscription can take hours,
+so you restore the target from a snapshot of the source instead. The slot
+must exist before you take the snapshot. Then it keeps every change written
+after the snapshot, and the subscription replays them once it starts.
 
 Newer Postgres versions may skip the missing publication with a warning
 instead of an error. Check the behavior on your version.
