@@ -1,13 +1,13 @@
 # Updating aggregate tables from triggers causes lock contention
 
-We had a ledger table where each entry has a `debit` and a `credit`. To
-report totals by month or year, we didn't want to read every entry. So we
-kept a summary table with one row per account per day, and summed those
-rows instead.
+At Pennylane, we had a ledger table where each entry has a `debit` and a
+`credit`. To report totals by month or year, we didn't want
+to read every entry. So we kept an aggregate table with one row per
+account per day, and summed those rows instead.
 
-The summary had to stay right, so every time an entry's `debit` or
-`credit` changed, the summary row of its day changed too. We did that
-with a trigger:
+The aggregate table had to stay right, so every time an entry's `debit`
+or `credit` changed, the row of its day in the aggregate table changed
+too. We did that with a trigger:
 
 ```sql
 CREATE FUNCTION update_daily_stats() RETURNS trigger AS $$
@@ -30,9 +30,10 @@ CREATE TRIGGER update_daily_stats
 ## The problem
 
 Writes to `ledger_entries` don't block each other, but the trigger turns
-each one into an update of a summary row. An update locks the row until
-the transaction commits. When many transactions write entries for the
-same account and day, they all need the same summary row, so they wait in
+each one into an update of the aggregate table. An update locks the row
+until the transaction commits. When many transactions write entries for
+the same account and day, they all need the same row in the aggregate
+table, so they wait in
 line, one at a time. A long transaction, such as a large import, holds
 the lock for its whole length.
 
@@ -41,12 +42,12 @@ the lock for its whole length.
 Keep the write path free of shared rows. Each transaction writes only its
 own entries, or inserts the change into a separate table, which never
 waits on another row. A periodic job then sums the changes since its last
-run and applies them to the summary with `INSERT ... ON CONFLICT DO
-UPDATE`. Only the job updates the summary rows, so nothing waits on them.
-The summary is a little behind, which is fine for monthly and yearly
-reports.
+run and applies them to the aggregate table with `INSERT ... ON CONFLICT
+DO UPDATE`. Only the job updates the aggregate table, so nothing waits on
+it. The aggregate table is a little behind, which is fine for monthly and
+yearly reports.
 
-Two other ways to build the summary away from the writers:
+Two other ways to build the aggregate table away from the writers:
 
 - **A materialized view**, refreshed on a schedule with
   `REFRESH MATERIALIZED VIEW CONCURRENTLY`. Each refresh recomputes
